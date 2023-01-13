@@ -91,7 +91,7 @@
         std::set<BracketMap::Index> recomputeIndicies, redrawIndicies;
 
         gboolean bracketColorsEnable[BracketType::COUNT];
-        gpointer bracketMaps[BracketType::COUNT];
+        BracketMap bracketMaps[BracketType::COUNT];
 
         BracketColorsData() :
             doc(NULL),
@@ -103,7 +103,6 @@
             init(FALSE)
         {
             for (int i = 0; i < BracketType::COUNT; i++) {
-                bracketMaps[i] = (gpointer) new BracketMap();
                 bracketColorsEnable[i] = TRUE;
             }
             // color matching angle brackets seems to cause
@@ -111,11 +110,7 @@
             bracketColorsEnable[BracketType::ANGLE] = FALSE;
         }
 
-        ~BracketColorsData() {
-            for (int i = 0; i < BracketType::COUNT; i++) {
-                delete reinterpret_cast<BracketMap *>(bracketMaps[i]);
-            }
-        }
+        ~BracketColorsData() {}
 
         void RemoveFromQueues(BracketMap::Index index) {
             {
@@ -448,7 +443,7 @@
 {
     for (int i = 0; i < BracketType::COUNT; i++) {
 
-        const BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(data.bracketMaps[i]);
+        const BracketMap &bracketMap = data.bracketMaps[i];
 
         for(
             auto it = bracketMap.mBracketMap.cbegin();
@@ -493,7 +488,7 @@
 {
     for (int i = 0; i < BracketType::COUNT; i++) {
 
-        const BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(data.bracketMaps[i]);
+        const BracketMap &bracketMap = data.bracketMaps[i];
 
         for(
             auto it = bracketMap.mBracketMap.cbegin();
@@ -574,7 +569,7 @@
 {
     for (int i = 0; i < BracketType::COUNT; i++) {
 
-        const BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(data.bracketMaps[i]);
+        const BracketMap &bracketMap = data.bracketMaps[i];
 
         auto it = bracketMap.mBracketMap.find(index);
         if (it == bracketMap.mBracketMap.end()) {
@@ -689,9 +684,7 @@
         return FALSE;
     }
 
-    BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(
-        bracketColorsData.bracketMaps[type]
-    );
+    BracketMap &bracketMap = bracketColorsData.bracketMaps[type];
 
     std::set<BracketMap::Index> indiciesToAdjust, indiciesToRecompute;
 
@@ -774,9 +767,7 @@
         return FALSE;
     }
 
-    BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(
-        bracketColorsData.bracketMaps[type]
-    );
+    BracketMap &bracketMap = bracketColorsData.bracketMaps[type];
 
     std::set<BracketMap::Index> indiciesToRemove, indiciesToRecompute;
 
@@ -939,9 +930,7 @@
 
             for (int bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
 
-                BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(
-                    data->bracketMaps[bracketType]
-                );
+                BracketMap &bracketMap = data->bracketMaps[bracketType];
 
                 if (
                     is_bracket_type(
@@ -1181,9 +1170,7 @@
         {
             for (int bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
 
-                BracketMap &bracketMap = *reinterpret_cast<BracketMap *>(
-                    data->bracketMaps[bracketType]
-                );
+                BracketMap &bracketMap = data->bracketMaps[bracketType];
 
                 if (
                     is_bracket_type(
