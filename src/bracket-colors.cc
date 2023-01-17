@@ -167,6 +167,7 @@
 }
 
 
+
 // -----------------------------------------------------------------------------
     static void bracket_colors_data_purge_all()
 /*
@@ -210,6 +211,7 @@
 
     return newBCD;
 }
+
 
 
 // -----------------------------------------------------------------------------
@@ -315,6 +317,7 @@
 }
 
 
+
 // -----------------------------------------------------------------------------
     static gint compute_bracket_at(
         ScintillaObject *sci,
@@ -366,6 +369,7 @@
 
     return braceIdentity;
 }
+
 
 
 // -----------------------------------------------------------------------------
@@ -429,131 +433,6 @@
         SSM(sci, SCI_INDICATORCLEARRANGE, 0, length);
     }
 }
-
-
-
-// -----------------------------------------------------------------------------
-    static void assign_bc_indicators(
-        ScintillaObject *sci,
-        const BracketColorsData &data
-    )
-/*
-    assign all indicators
------------------------------------------------------------------------------ */
-{
-    for (int i = 0; i < BracketType::COUNT; i++) {
-
-        const BracketMap &bracketMap = data.bracketMaps[i];
-
-        for(
-            auto it = bracketMap.mBracketMap.cbegin();
-            it != bracketMap.mBracketMap.end();
-            it++
-        )
-        {
-            auto position = it->first;
-            auto bracket = it->second;
-
-            if (BracketMap::GetLength(bracket) != BracketMap::UNDEFINED) {
-
-                std::array<int, 2> positions {
-                    { position, position + BracketMap::GetLength(bracket) }
-                };
-
-                for (auto position : positions) {
-                    SSM(
-                        sci,
-                        SCI_SETINDICATORCURRENT,
-                        sIndicatorIndex + \
-                            ((BracketMap::GetOrder(bracket) + i) % BC_NUM_COLORS),
-                        BC_NO_ARG
-                    );
-                    SSM(sci, SCI_INDICATORFILLRANGE, position, 1);
-                }
-            }
-        }
-    }
-}
-
-
-
-// -----------------------------------------------------------------------------
-    static void set_bc_indicators(
-        ScintillaObject *sci,
-        const BracketColorsData &data
-    )
-/*
-    assign all indicators, check if already correct
------------------------------------------------------------------------------ */
-{
-    for (int i = 0; i < BracketType::COUNT; i++) {
-
-        const BracketMap &bracketMap = data.bracketMaps[i];
-
-        for(
-            auto it = bracketMap.mBracketMap.cbegin();
-            it != bracketMap.mBracketMap.end();
-            it++
-        )
-        {
-            auto position = it->first;
-            auto bracket = it->second;
-
-            if (BracketMap::GetLength(bracket) != BracketMap::UNDEFINED) {
-
-                std::array<int, 2> positions {
-                    { position, position + BracketMap::GetLength(bracket) }
-                };
-
-                for (auto position : positions) {
-
-                    unsigned correctIndicatorIndex = sIndicatorIndex + \
-                        ((BracketMap::GetOrder(bracket) + i) % BC_NUM_COLORS);
-
-                    int curr = SSM(sci, SCI_INDICATORVALUEAT, correctIndicatorIndex, position);
-                    if (not curr) {
-                        // g_debug(
-                        //     "%s: Setting indicator %d at %d",
-                        //     __FUNCTION__,
-                        //     correctIndicatorIndex, position
-                        // );
-                        SSM(
-                            sci,
-                            SCI_SETINDICATORCURRENT,
-                            correctIndicatorIndex,
-                            BC_NO_ARG
-                        );
-                        SSM(sci, SCI_INDICATORFILLRANGE, position, 1);
-                    }
-
-                    // make sure there arent any other indicators at position
-                    for (
-                        int indicatorIndex = sIndicatorIndex;
-                        indicatorIndex < sIndicatorIndex + BC_NUM_COLORS;
-                        indicatorIndex++
-                    )
-                    {
-                        if (indicatorIndex == correctIndicatorIndex) {
-                            continue;
-                        }
-
-                        int hasIndicator = SSM(sci, SCI_INDICATORVALUEAT, indicatorIndex, position);
-                        if (hasIndicator) {
-                            SSM(
-                                sci,
-                                SCI_SETINDICATORCURRENT,
-                                indicatorIndex,
-                                BC_NO_ARG
-                            );
-                            SSM(sci, SCI_INDICATORCLEARRANGE, position, 1);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 
 
 
@@ -910,63 +789,6 @@
 
 
 // -----------------------------------------------------------------------------
-    static void compute_document(
-        ScintillaObject *sci,
-        BracketColorsData *data,
-        bool doRender = true
-    )
-/*
-
------------------------------------------------------------------------------ */
-{
-    if (data->recomputeIndicies.size()) {
-
-        g_debug(
-            "%s: Recomputing %d brackets",
-            __FUNCTION__, data->recomputeIndicies.size()
-        );
-
-        for (const auto &position : data->recomputeIndicies) {
-
-            for (int bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
-
-                BracketMap &bracketMap = data->bracketMaps[bracketType];
-
-                if (
-                    is_bracket_type(
-                        char_at(sci, position),
-                        static_cast<BracketType>(bracketType)
-                    )
-                ) {
-                    // check if in a comment
-                    if (isIgnoreStyle(sci, position)) {
-                        clear_bc_indicators(sci, position, 1);
-                        bracketMap.mBracketMap.erase(position);
-                    }
-                    else {
-                        gint brace = compute_bracket_at(sci, bracketMap, position);
-                        if (brace >= 0) {
-                            data->redrawIndicies.insert(brace);
-                        }
-                    }
-                }
-
-                bracketMap.ComputeOrder();
-            }
-        }
-
-        data->recomputeIndicies.clear();
-        data->updateUI = TRUE;
-    }
-
-    if (doRender) {
-        render_document(sci, data);
-    }
-}
-
-
-
-// -----------------------------------------------------------------------------
     static void on_sci_notify(
         ScintillaObject *sci,
         gint scn,
@@ -1147,9 +969,6 @@
     }
 
     if (data->init == FALSE) {
-        // for (int i = 0; i < BracketType::COUNT; i++) {
-        //     find_all_brackets(sci, *data, static_cast<BracketType>(i));
-        // }
         find_all_brackets(*data);
         data->init = TRUE;
     }

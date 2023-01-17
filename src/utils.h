@@ -73,19 +73,19 @@
 
 ----------------------------------------------------------------------------- */
 {
-	gchar buf[64] = {0};
+    gchar buf[64] = {0};
 
-	g_return_val_if_fail(spec != NULL, -1);
+    g_return_val_if_fail(spec != NULL, -1);
 
-	if (spec[0] == '0' && (spec[1] == 'x' || spec[1] == 'X'))
-	{
-		/* convert to # format for GDK to understand it */
-		buf[0] = '#';
-		strncpy(buf + 1, spec + 2, sizeof(buf) - 2);
-		spec = buf;
-	}
+    if (spec[0] == '0' && (spec[1] == 'x' || spec[1] == 'X'))
+    {
+        /* convert to # format for GDK to understand it */
+        buf[0] = '#';
+        strncpy(buf + 1, spec + 2, sizeof(buf) - 2);
+        spec = buf;
+    }
 
-	return gdk_color_parse(spec, color);
+    return gdk_color_parse(spec, color);
 }
 
 
@@ -96,8 +96,8 @@
 
 ----------------------------------------------------------------------------- */
 {
-	g_return_val_if_fail(c != NULL, -1);
-	return (c->red / 256) | ((c->green / 256) << 8) | ((c->blue / 256) << 16);
+    g_return_val_if_fail(c != NULL, -1);
+    return (c->red / 256) | ((c->green / 256) << 8) | ((c->blue / 256) << 16);
 }
 
 
@@ -108,11 +108,11 @@
 
 ----------------------------------------------------------------------------- */
 {
-	GdkColor color;
-	if (utils_parse_color(spec, &color)) {
-		return utils_color_to_bgr(&color);
+    GdkColor color;
+    if (utils_parse_color(spec, &color)) {
+        return utils_color_to_bgr(&color);
     }
-	else {
+    else {
         return -1;
     }
 }
@@ -125,7 +125,7 @@
 
 ----------------------------------------------------------------------------- */
 {
-	return sci_get_char_at(sci, pos);
+    return sci_get_char_at(sci, pos);
 }
 
 
