@@ -1,6 +1,6 @@
 # bracket-colors
 
-Color nested brackets in Geany
+Proof of concept for coloring nested brackets in Geany
 
 ## Building
 
@@ -20,7 +20,3 @@ Plugin is in `build/src/bracket-colors.so`
 **Installing**
 
 Install into existing geany lib directory with `make install` in the build directory or manually copy/symlink `bracket-colors.so`
-
-### Autotools
-
-TODO
