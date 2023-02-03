@@ -1,48 +1,31 @@
-/* -----------------------------------------------------------------------------
+/*
+ *      BracketMap.cc
+ *
+ *      Copyright 2013 Asif Amin <asifamin@utexas.edu>
+ *
+ *      This program is free software; you can redistribute it and/or modify
+ *      it under the terms of the GNU General Public License as published by
+ *      the Free Software Foundation; either version 2 of the License, or
+ *      (at your option) any later version.
+ *
+ *      This program is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *      GNU General Public License for more details.
+ *      You should have received a copy of the GNU General Public License
+ *      along with this program; if not, write to the Free Software
+ *      Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ *      MA 02110-1301, USA.
+ */
 
-    Asif Amin
-    asifamin@utexas.edu
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-    MA 02110-1301, USA.
-
------------------------------------------------------------------------------ */
-
-#define G_LOG_USE_STRUCTURED
-#define G_LOG_DOMAIN "BracketMap"
-#include <glib.h>
-
-/* --------------------------------- INCLUDES ------------------------------- */
-/* ----- Platform ------- */
-/* ----- Standard ------- */
 #include <stack>
 #include <set>
-/* ------- User --------- */
+
 #include "BracketMap.h"
-
-/* ----------------------------------- USES --------------------------------- */
-
-/* ----------------------------------- TYPES -------------------------------- */
-
-/* --------------------------------- CONSTANTS ------------------------------ */
-
-/* ---------------------------------- EXTERNS ------------------------------- */
-
-/* --------------------------------- PROTOTYPES ----------------------------- */
-
-/* ------------------------------ IMPLEMENTATION ---------------------------- */
-
 
 
 // -----------------------------------------------------------------------------
@@ -138,13 +121,13 @@
 
     for (const auto it : mBracketMap) {
 
-        const int &startIndex = it.first;
+        const Index &startIndex = it.first;
         const Bracket &bracket = it.second;
 
-        int length = std::get<0>(bracket);
-        int order = std::get<1>(bracket);
+        Length length = std::get<0>(bracket);
+        Order order = std::get<1>(bracket);
 
-        int end = -1;
+        Index end = -1;
         if (length > 0) {
             end = startIndex + length;
         }
