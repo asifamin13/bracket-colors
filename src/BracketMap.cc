@@ -1,7 +1,7 @@
 /*
  *      BracketMap.cc
  *
- *      Copyright 2013 Asif Amin <asifamin@utexas.edu>
+ *      Copyright 2023 Asif Amin <asifamin@utexas.edu>
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -67,14 +67,14 @@
 }
 
 
-
 // -----------------------------------------------------------------------------
-    void BracketMap::ComputeOrder()
+    std::set<BracketMap::Index> BracketMap::ComputeOrder()
 /*
 
 ----------------------------------------------------------------------------- */
 {
     std::stack<Index> orderStack;
+    std::set<Index> updatedBrackets;
 
     for (auto &it : mBracketMap) {
 
@@ -106,38 +106,14 @@
             orderStack.push(endPos);
         }
 
-        GetOrder(bracket) = orderStack.size() - 1;
-    }
-}
-
-
-
-// -----------------------------------------------------------------------------
-    void BracketMap::Show()
-/*
-
------------------------------------------------------------------------------ */
-{   g_debug("%s: Showing bracket map ...", __FUNCTION__);
-
-    for (const auto it : mBracketMap) {
-
-        const Index &startIndex = it.first;
-        const Bracket &bracket = it.second;
-
-        Length length = std::get<0>(bracket);
-        Order order = std::get<1>(bracket);
-
-        Index end = -1;
-        if (length > 0) {
-            end = startIndex + length;
+        Order newOrder = orderStack.size() - 1;
+        Order currOrder = GetOrder(bracket);
+        if (newOrder != currOrder) {
+            updatedBrackets.insert(startIndex);
         }
 
-        g_debug(
-            "%s: Bracket at %d, Length: %d, End: %d, Order: %d",
-            __FUNCTION__, startIndex, length, end, order
-        );
+        GetOrder(bracket) = newOrder;
     }
 
-    g_debug("%s: ... Finished showing bracket map", __FUNCTION__);
+    return updatedBrackets;
 }
-
