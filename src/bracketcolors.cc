@@ -1399,7 +1399,10 @@
     Load module
 ----------------------------------------------------------------------------- */
 {
+
+#ifdef HAVE_LOCALE_H
     main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
+#endif
 
     /* Set metadata */
     plugin->info->name          = _("Bracket Colors");
