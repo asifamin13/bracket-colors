@@ -6,6 +6,8 @@ pkg_get_variable( PLUGIN_DIR geany libdir )
 add_library( bracketcolors SHARED
     bracketcolors.cc
     BracketMap.cc
+    Configuration.cc
+    Utils.cc
 )
 
 add_definitions( ${GEANY_CFLAGS} )

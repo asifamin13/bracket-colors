@@ -1,7 +1,7 @@
 /*
  *      bracketcolors.cc
  *
- *      Copyright 2013 Asif Amin <asifamin@utexas.edu>
+ *      Copyright 2023 Asif Amin <asifamin@utexas.edu>
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -30,19 +30,13 @@
 # include <locale.h>
 #endif
 
-#include <string>
-#include <array>
-#include <set>
-#include <map>
-
-#include <glib.h>
-
 #include <geanyplugin.h>
 #include "sciwrappers.h"
 
 #include "BracketMap.h"
+#include "Utils.h"
+#include "Configuration.h"
 
-#define BC_NUM_COLORS 3
 #define BC_NO_ARG 0
 #define BC_STOP_ACTION TRUE
 #define BC_CONTINUE_ACTION FALSE
@@ -51,21 +45,6 @@
 
 
 /* --------------------------------- CONSTANTS ------------------------------ */
-
-    typedef std::array<std::string, BC_NUM_COLORS> BracketColorArray;
-
-    /*
-     * These were copied from VS Code
-     * TODO: Make this user configurable, get from theme?
-     */
-
-    static const BracketColorArray sDarkBackgroundColors = {
-        "#FF00FF", "#FFFF00", "#00FFFF"
-    };
-
-    static const BracketColorArray sLightBackgroundColors = {
-        "#008000", "#000080", "#800000"
-    };
 
     static const gchar *sPluginName = "bracketcolors";
 
@@ -89,9 +68,7 @@
          */
 
         GeanyDocument *doc;
-
         guint32 backgroundColor;
-        BracketColorArray bracketColors;
 
         gboolean init;
 
@@ -106,7 +83,6 @@
 
         BracketColorsData() :
             doc(NULL),
-            bracketColors(sLightBackgroundColors),
             init(FALSE),
             computeTimeoutID(0),
             computeInterval(500),
@@ -131,6 +107,10 @@
         void StartTimers();
         void StopTimers();
     };
+
+/* ---------------------------------- GLOBALS ------------------------------- */
+
+    static BracketColorsPluginConfiguration gPluginConfiguration(TRUE, sLightBackgroundColors);
 
 /* ---------------------------------- EXTERNS ------------------------------- */
 
@@ -161,9 +141,6 @@
             NULL
         );
     }
-    else {
-        //g_debug("%s: computeTimeoutID already set", __FUNCTION__);
-    }
 
     if (drawTimeoutID == 0) {
         drawTimeoutID = g_timeout_add_full(
@@ -173,9 +150,6 @@
             this,
             NULL
         );
-    }
-    else {
-        //g_debug("%s: drawTimeoutID already set", __FUNCTION__);
     }
 }
 
@@ -192,16 +166,10 @@
         g_source_remove(computeTimeoutID);
         computeTimeoutID = 0;
     }
-    else {
-        //g_debug("%s: computeTimeoutID already 0", __FUNCTION__);
-    }
 
     if (drawTimeoutID > 0) {
         g_source_remove(drawTimeoutID);
         drawTimeoutID = 0;
-    }
-    else {
-        //g_debug("%s: drawTimeoutID already 0", __FUNCTION__);
     }
 }
 
@@ -229,94 +197,6 @@
 }
 
 
-// -----------------------------------------------------------------------------
-    static gboolean utils_is_dark(guint32 color)
-
-/*
-
------------------------------------------------------------------------------ */
-{
-    guint8 b = color >> 16;
-    guint8 g = color >> 8;
-    guint8 r = color;
-
-    // https://stackoverflow.com/questions/596216/formula-to-determine-perceived-brightness-of-rgb-color
-    guint8 y  = ((r << 1) + r + (g << 2) + b) >> 3;
-
-    if (y < 125) {
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-
-
-// -----------------------------------------------------------------------------
-    static gboolean utils_parse_color(
-        const gchar *spec,
-        GdkColor *color
-    )
-/*
-
------------------------------------------------------------------------------ */
-{
-    gchar buf[64] = {0};
-
-    g_return_val_if_fail(spec != NULL, -1);
-
-    if (spec[0] == '0' && (spec[1] == 'x' || spec[1] == 'X'))
-    {
-        /* convert to # format for GDK to understand it */
-        buf[0] = '#';
-        strncpy(buf + 1, spec + 2, sizeof(buf) - 2);
-        spec = buf;
-    }
-
-    return gdk_color_parse(spec, color);
-}
-
-
-
-// -----------------------------------------------------------------------------
-    static gint utils_color_to_bgr(const GdkColor *c)
-/*
-
------------------------------------------------------------------------------ */
-{
-    g_return_val_if_fail(c != NULL, -1);
-    return (c->red / 256) | ((c->green / 256) << 8) | ((c->blue / 256) << 16);
-}
-
-
-
-// -----------------------------------------------------------------------------
-    static gint utils_parse_color_to_bgr(const gchar *spec)
-/*
-
------------------------------------------------------------------------------ */
-{
-    GdkColor color;
-    if (utils_parse_color(spec, &color)) {
-        return utils_color_to_bgr(&color);
-    }
-    else {
-        return -1;
-    }
-}
-
-
-
-// -----------------------------------------------------------------------------
-    static gchar char_at(ScintillaObject *sci, gint pos)
-/*
-
------------------------------------------------------------------------------ */
-{
-    return sci_get_char_at(sci, pos);
-}
-
-
 
 // -----------------------------------------------------------------------------
     static void assign_indicator_colors(
@@ -328,9 +208,9 @@
 {
     ScintillaObject *sci = data->doc->editor->sci;
 
-    for (guint i = 0; i < data->bracketColors.size(); i++) {
+    for (guint i = 0; i < gPluginConfiguration.mColors.size(); i++) {
         guint index = sIndicatorIndex + i;
-        std::string spec = data->bracketColors.at(i);
+        std::string spec = gPluginConfiguration.mColors.at(i);
         gint color = utils_parse_color_to_bgr(spec.c_str());
         SSM(sci, SCI_INDICSETSTYLE, index, INDIC_TEXTFORE);
         SSM(sci, SCI_INDICSETFORE, index, color);
@@ -340,7 +220,7 @@
 
 
 // -----------------------------------------------------------------------------
-    static gboolean hasDocument(void)
+    static gboolean has_document(void)
 /*
     sanity check
 ----------------------------------------------------------------------------- */
@@ -353,7 +233,7 @@
 
 
 // -----------------------------------------------------------------------------
-    static gboolean isCurrDocument(
+    static gboolean is_curr_document(
         BracketColorsData *data
     )
 /*
@@ -379,11 +259,6 @@
 
 ----------------------------------------------------------------------------- */
 {
-    // g_debug(
-    //     "%s: Purging a BracketColorsData",
-    //     __FUNCTION__
-    // );
-
     BracketColorsData *bcd = reinterpret_cast<BracketColorsData *>(data);
     delete bcd;
 }
@@ -533,11 +408,6 @@
 
         gint length = matchedBrace - position;
 
-        // g_debug(
-        //     "%s: bracket at %d matched at %d",
-        //     __FUNCTION__, position, matchedBrace
-        // );
-
         if (length > 0) {
             // matched from start brace
             bracketMap.Update(position, length);
@@ -551,9 +421,8 @@
     }
     else {
         // invalid mapping
-        // g_debug("%s: bracket at %d invalid", __FUNCTION__, position);
 
-        if (is_open_bracket(char_at(sci, position), BracketType::COUNT)) {
+        if (is_open_bracket(sci_get_char_at(sci, position), BracketType::COUNT)) {
             if (updateInvalidMapping) {
                 bracketMap.Update(position, BracketMap::UNDEFINED);
             }
@@ -570,7 +439,7 @@
 
 
 // -----------------------------------------------------------------------------
-    static gboolean isIgnoreStyle(
+    static gboolean is_ignore_style(
         BracketColorsData *data,
         gint position
     )
@@ -600,7 +469,7 @@
 
     gint length = sci_get_length(sci);
     for (gint i = 0; i < length; i++) {
-        gchar ch = char_at(sci, i);
+        gchar ch = sci_get_char_at(sci, i);
         if (is_bracket_type(ch, BracketType::COUNT)) {
             for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
                 if (data.bracketColorsEnable[bracketType] == TRUE) {
@@ -663,16 +532,11 @@
 
             for (auto position : positions) {
 
-                unsigned correctIndicatorIndex = sIndicatorIndex + \
+                guint correctIndicatorIndex = sIndicatorIndex + \
                     ((BracketMap::GetOrder(bracket) + i) % BC_NUM_COLORS);
 
                 gint curr = SSM(sci, SCI_INDICATORVALUEAT, correctIndicatorIndex, position);
                 if (not curr) {
-                    // g_debug(
-                    //     "%s: Setting indicator %d at %d",
-                    //     __FUNCTION__,
-                    //     correctIndicatorIndex, position
-                    // );
                     SSM(
                         sci,
                         SCI_SETINDICATORCURRENT,
@@ -729,9 +593,7 @@
         )
         {
             gint hasIndicator = SSM(sci, SCI_INDICATORVALUEAT, indicatorIndex, i);
-            // g_debug("%s: Indicator %d: %d", __FUNCTION__, indicatorIndex, hasIndicator);
             if (hasIndicator) {
-                // g_debug("%s: Clearing bracket at %d", __FUNCTION__, i);
                 SSM(
                     sci,
                     SCI_SETINDICATORCURRENT,
@@ -788,40 +650,54 @@
 
     // Check if the new characters that are added were brackets
     for (gint i = position; i < position + length; i++) {
-        gchar newChar = char_at(sci, i);
+        gchar newChar = sci_get_char_at(sci, i);
         if (is_bracket_type(newChar, type)) {
-            // g_debug("%s: Handling new bracket character", __FUNCTION__);
             madeChange = TRUE;
-            bracketColorsData.recomputeIndicies.insert(i);
+            indiciesToRecompute.insert(i);
         }
     }
 
-    // g_debug(
-    //     "%s: Need to adjust %d brackets, recompute %d brackets",
-    //     __FUNCTION__, indiciesToAdjust.size(), indiciesToRecompute.size()
-    // );
-
     if (not indiciesToAdjust.size() and not indiciesToRecompute.size()) {
-        //g_debug("%s: Nothing to do", __FUNCTION__);
         return madeChange;
     }
 
-    for (const auto &it : indiciesToRecompute) {
-        //g_debug("%s: Recomputing bracket at %d", __FUNCTION__, it);
-        bracketColorsData.recomputeIndicies.insert(it);
-    }
+    bracketColorsData.recomputeIndicies.insert(
+        indiciesToRecompute.begin(), indiciesToRecompute.end()
+    );
+
+    std::set<BracketMap::Index> newIndicies;
+    auto origBracketMap = bracketMap.mBracketMap;
 
     for (const auto &it : indiciesToAdjust) {
-        //g_debug("%s: Moved brace at %d to %d", __FUNCTION__, it, it + length);
-        bracketMap.mBracketMap.insert(
-            std::make_pair(
-                it + length,
-                bracketMap.mBracketMap.at(it)
-            )
+
+        /*
+         * Move bracket, remove old position
+         */
+
+        gint newIndex = it + length;
+
+        newIndicies.insert(newIndex);
+        bracketMap.mBracketMap.insert_or_assign(
+            newIndex,
+            origBracketMap.at(it)
         );
 
-        bracketMap.mBracketMap.erase(it);
-        bracketColorsData.RemoveFromQueues(it);
+        // dont remove newly added indicies
+        if (newIndicies.find(it) == newIndicies.end()) {
+            bracketMap.mBracketMap.erase(it);
+        }
+
+        /*
+         * Check if new bracket was placed into position of old adjusted bracket
+         * that we just deleted. If so, don't remove it from the work queue
+         */
+
+        if (
+            bracketColorsData.recomputeIndicies.find(it) == \
+                bracketColorsData.recomputeIndicies.end()
+        ) {
+            bracketColorsData.RemoveFromQueues(it);
+        }
     }
 
     return TRUE;
@@ -846,7 +722,7 @@
 
     BracketMap &bracketMap = bracketColorsData.bracketMaps[type];
 
-    std::set<BracketMap::Index> indiciesToRemove, indiciesToRecompute;
+    std::set<BracketMap::Index> indiciesToRemove, indiciesToRecompute, orphanedIndicies;
 
     for (const auto &it : bracketMap.mBracketMap) {
         const auto &bracket = it.second;
@@ -854,28 +730,29 @@
         // start bracket was deleted
         if ( (it.first >= position) and (it.first < position + length) ) {
             indiciesToRemove.insert(it.first);
+            // if the end bracket is valid and still present
+            if (endPos > it.first and endPos >= (position + length)) {
+                orphanedIndicies.insert(endPos - length);
+            }
         }
         // end bracket removed or space removed
-        else if (it.first >= position or endPos >= position) {
+        else if (
+            it.first >= position or
+            endPos >= position or
+            BracketMap::GetLength(bracket) == BracketMap::UNDEFINED
+        ) {
             indiciesToRecompute.insert(it.first);
         }
     }
-
-    // g_debug(
-    //     "%s: Need to remove %d brackets, adjust %d brackets",
-    //     __FUNCTION__, indiciesToRemove.size(), indiciesToRecompute.size()
-    // );
 
     if (
         not indiciesToRemove.size() and
         not indiciesToRecompute.size()
     ) {
-        //g_debug("%s: Nothing to do", __FUNCTION__);
         return FALSE;
     }
 
     for (const auto &it : indiciesToRemove) {
-        //g_debug("%s: Removing brace at %d", __FUNCTION__, it);
         bracketMap.mBracketMap.erase(it);
         bracketColorsData.RemoveFromQueues(it);
     }
@@ -883,22 +760,23 @@
     for (const auto &it : indiciesToRecompute) {
         // first bracket was moved backwards
         if (it >= position) {
-            //g_debug("%s: Moved brace at %d to %d", __FUNCTION__, it, it - length);
-            bracketMap.mBracketMap.insert(
-                std::make_pair(
-                    it - length,
-                    bracketMap.mBracketMap.at(it)
-                )
+            bracketMap.mBracketMap.insert_or_assign(
+                it - length,
+                bracketMap.mBracketMap.at(it)
             );
             bracketMap.mBracketMap.erase(it);
             bracketColorsData.RemoveFromQueues(it);
         }
         // last bracket was moved
         else {
-            //g_debug("%s: Recomputing bracket at %d", __FUNCTION__, it);
             bracketColorsData.recomputeIndicies.insert(it);
         }
     }
+
+    // for orphaned end brackets, just recompute them
+    bracketColorsData.recomputeIndicies.insert(
+        orphanedIndicies.begin(), orphanedIndicies.end()
+    );
 
     return TRUE;
 }
@@ -915,10 +793,6 @@
 ----------------------------------------------------------------------------- */
 {
     if (data->updateUI) {
-        // g_debug(
-        //     "%s: Need to update %d indicies",
-        //     __FUNCTION__, data->redrawIndicies.size()
-        // );
 
         for (
             auto position = data->redrawIndicies.begin();
@@ -958,7 +832,7 @@
 
             if (nt->updated & SC_UPDATE_CONTENT) {
 
-                if (isCurrDocument(data)) {
+                if (is_curr_document(data)) {
                     render_document(sci, data);
                 }
             }
@@ -969,10 +843,6 @@
         case(SCN_MODIFIED):
         {
             if (nt->modificationType & SC_MOD_INSERTTEXT) {
-                // g_debug(
-                //     "%s: Text added. Position: %d, Length: %d",
-                //     __FUNCTION__, nt->position, nt->length
-                // );
 
                 // if we insert into position that had bracket
                 clear_bc_indicators(sci, nt->position, nt->length);
@@ -996,10 +866,6 @@
             }
 
             if (nt->modificationType & SC_MOD_DELETETEXT) {
-                // g_debug(
-                //     "%s: Text removed. Position: %d, Length: %d",
-                //     __FUNCTION__, nt->position, nt->length
-                // );
 
                 for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
                     if (
@@ -1016,10 +882,6 @@
             }
 
             if (nt->modificationType & SC_MOD_CHANGESTYLE) {
-                // g_debug(
-                //     "%s: Style change. Position: %d, Length: %d",
-                //     __FUNCTION__, nt->position, nt->length
-                // );
 
                 if (data->init == TRUE) {
                     for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
@@ -1027,9 +889,8 @@
                             continue;
                         }
                         for (gint i = nt->position; i < nt->position + nt->length; i++) {
-                            gchar currChar = char_at(sci, i);
+                            gchar currChar = sci_get_char_at(sci, i);
                             if (is_bracket_type(currChar, static_cast<BracketType>(bracketType))) {
-                                //g_debug("%s: Handling style change for bracket at %d", __FUNCTION__, i);
                                 data->recomputeIndicies.insert(i);
                             }
                         }
@@ -1052,13 +913,13 @@
 
 ----------------------------------------------------------------------------- */
 {
-    if (not hasDocument()) {
+    if (not has_document()) {
         return FALSE;
     }
 
     BracketColorsData *data = reinterpret_cast<BracketColorsData *>(user_data);
 
-    if (not isCurrDocument(data)) {
+    if (not is_curr_document(data)) {
         data->StopTimers();
         return FALSE;
     }
@@ -1070,14 +931,10 @@
     ScintillaObject *sci = data->doc->editor->sci;
     guint32 currBGColor = SSM(sci, SCI_STYLEGETBACK, STYLE_DEFAULT, BC_NO_ARG);
     if (currBGColor != data->backgroundColor) {
-        g_debug("%s: background color changed: %#04x", __FUNCTION__, currBGColor);
-
         gboolean currDark = utils_is_dark(currBGColor);
         gboolean wasDark = utils_is_dark(data->backgroundColor);
-
-        if (currDark != wasDark) {
-            g_debug("%s: Need to change colors scheme!", __FUNCTION__);
-            data->bracketColors = currDark ? sDarkBackgroundColors : sLightBackgroundColors;
+        if (currDark != wasDark and gPluginConfiguration.mUseDefaults) {
+            gPluginConfiguration.mColors = currDark ? sDarkBackgroundColors : sLightBackgroundColors;
             assign_indicator_colors(data);
         }
 
@@ -1101,14 +958,14 @@
 
 ----------------------------------------------------------------------------- */
 {
-    static const unsigned sIterationLimit = 50;
+    static const guint sIterationLimit = 50;
 
-    if (not hasDocument()) {
+    if (not has_document()) {
         return FALSE;
     }
 
     BracketColorsData *data = reinterpret_cast<BracketColorsData *>(user_data);
-    if (not isCurrDocument(data)) {
+    if (not is_curr_document(data)) {
         data->StopTimers();
         return FALSE;
     }
@@ -1122,12 +979,7 @@
 
         ScintillaObject *sci = data->doc->editor->sci;
 
-        // g_debug(
-        //     "%s: have to recompute %d indicies",
-        //     __FUNCTION__, data->recomputeIndicies.size()
-        // );
-
-        unsigned numIterations = 0;
+        guint numIterations = 0;
         for (
             auto position = data->recomputeIndicies.begin();
             position != data->recomputeIndicies.end();
@@ -1140,12 +992,12 @@
 
                 if (
                     is_bracket_type(
-                        char_at(sci, *position),
+                        sci_get_char_at(sci, *position),
                         static_cast<BracketType>(bracketType)
                     )
                 ) {
                     // check if in a comment
-                    if (isIgnoreStyle(data, *position)) {
+                    if (is_ignore_style(data, *position)) {
                         bracketMap.mBracketMap.erase(*position);
                         clear_bc_indicators(sci, *position, 1);
                     }
@@ -1157,13 +1009,19 @@
                         data->updateUI = TRUE;
                     }
                 }
-
-                bracketMap.ComputeOrder();
             }
 
             position = data->recomputeIndicies.erase(position);
             if (numIterations >= sIterationLimit) {
                 break;
+            }
+        }
+
+        if (data->updateUI) {
+            for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
+                BracketMap &bracketMap = data->bracketMaps[bracketType];
+                std::set<BracketMap::Index> updatedBrackets = bracketMap.ComputeOrder();
+                data->redrawIndicies.insert(updatedBrackets.begin(), updatedBrackets.end());
             }
         }
     }
@@ -1184,19 +1042,14 @@
 ----------------------------------------------------------------------------- */
 {
     g_return_if_fail(DOC_VALID(doc));
-    //g_debug("%s: closing document '%d'", __FUNCTION__, doc->id);
-
     gpointer pluginData = plugin_get_document_data(geany_plugin, doc, sPluginName);
     if (pluginData != NULL) {
         BracketColorsData *data = reinterpret_cast<BracketColorsData *>(pluginData);
-        //g_debug("%s: Closing doc ID: %d", __FUNCTION__, data->doc->id);
         data->StopTimers();
     }
 
     ScintillaObject *sci = doc->editor->sci;
     remove_bc_indicators(sci);
-
-    //g_debug("%s: finished close routine", __FUNCTION__);
 }
 
 
@@ -1211,11 +1064,10 @@
 
 ----------------------------------------------------------------------------- */
 {
-    //g_debug("%s: handling document activate", __FUNCTION__);
     gpointer pluginData = plugin_get_document_data(geany_plugin, doc, sPluginName);
     if (pluginData != NULL) {
         BracketColorsData *data = reinterpret_cast<BracketColorsData *>(pluginData);
-        //g_debug("%s: got page switch to doc ID: %d", __FUNCTION__, data->doc->id);
+        assign_indicator_colors(data);
         data->StartTimers();
     }
 }
@@ -1231,18 +1083,35 @@
 
 ----------------------------------------------------------------------------- */
 {
-    //g_debug("%s: handling startup complete", __FUNCTION__);
     GeanyDocument *currDoc = document_get_current();
     if (currDoc != NULL) {
         gpointer pluginData = plugin_get_document_data(geany_plugin, currDoc, sPluginName);
         if (pluginData != NULL) {
             BracketColorsData *data = reinterpret_cast<BracketColorsData *>(pluginData);
-            g_debug("%s: starting on doc ID: %d", __FUNCTION__, data->doc->id);
             data->StartTimers();
         }
     }
 }
 
+
+
+// -----------------------------------------------------------------------------
+    static std::string get_config_filename(void)
+/*
+
+----------------------------------------------------------------------------- */
+{
+    std::string configFile(sPluginName);
+    configFile.append(".conf");
+
+    return std::string(
+        g_build_filename(
+            geany_data->app->configdir, "plugins",
+            sPluginName, configFile.c_str(),
+            NULL
+        )
+    );
+}
 
 
 
@@ -1257,7 +1126,6 @@
 ----------------------------------------------------------------------------- */
 {
     g_return_if_fail(DOC_VALID(doc));
-    //g_debug("%s: opening document '%d'", __FUNCTION__, doc->id);
 
     BracketColorsData *data = bracket_colors_data_new(doc);
     ScintillaObject *sci = doc->editor->sci;
@@ -1275,8 +1143,17 @@
      */
 
     data->backgroundColor = SSM(sci, SCI_STYLEGETBACK, STYLE_DEFAULT, BC_NO_ARG);
-    if (utils_is_dark(data->backgroundColor)) {
-        data->bracketColors = sDarkBackgroundColors;
+
+    if (gPluginConfiguration.mUseDefaults) {
+        if (utils_is_dark(data->backgroundColor)) {
+            gPluginConfiguration.mColors = sDarkBackgroundColors;
+        }
+        else {
+            gPluginConfiguration.mColors = sLightBackgroundColors;
+        }
+    }
+    else {
+        gPluginConfiguration.mColors = gPluginConfiguration.mCustomColors;
     }
 
     assign_indicator_colors(data);
@@ -1290,7 +1167,7 @@
 
 
 // -----------------------------------------------------------------------------
-    static gboolean plugin_bracketcolors_init (
+    static gboolean plugin_bracketcolors_init(
         GeanyPlugin *plugin,
         gpointer pdata
     )
@@ -1298,10 +1175,10 @@
 
 ----------------------------------------------------------------------------- */
 {
-    g_debug("%s: seting up plugin", __FUNCTION__);
-
     geany_plugin = plugin;
     geany_data = plugin->geany_data;
+
+    gPluginConfiguration.LoadConfig(get_config_filename());
 
     gboolean inInit = TRUE;
 
@@ -1334,13 +1211,169 @@
 
 ----------------------------------------------------------------------------- */
 {
-    g_debug("%s: leaving bracket colors", __FUNCTION__);
-
     guint i = 0;
     foreach_document(i)
     {
         on_document_close(NULL, documents[i], NULL);
     }
+
+    gPluginConfiguration.SaveConfig(get_config_filename());
+}
+
+
+
+// -----------------------------------------------------------------------------
+    static void update_colors(void)
+/*
+
+----------------------------------------------------------------------------- */
+{
+    if (not gPluginConfiguration.mUseDefaults) {
+        gPluginConfiguration.mColors = gPluginConfiguration.mCustomColors;
+    }
+
+    if (has_document()) {
+
+        GtkNotebook *notebook = GTK_NOTEBOOK(geany_data->main_widgets->notebook);
+        gint currPage = gtk_notebook_get_current_page(notebook);
+        GeanyDocument *currDoc = document_get_from_page(currPage);
+
+        if (currDoc != NULL) {
+
+            gpointer docData = plugin_get_document_data(
+                geany_plugin, currDoc, sPluginName
+            );
+
+            if (docData != NULL) {
+                BracketColorsData *bcd = reinterpret_cast<BracketColorsData *>(docData);
+
+                if (gPluginConfiguration.mUseDefaults) {
+                    gboolean isDark = utils_is_dark(bcd->backgroundColor);
+                    gPluginConfiguration.mColors = isDark ? sDarkBackgroundColors : sLightBackgroundColors;
+                }
+                assign_indicator_colors(bcd);
+            }
+        }
+    }
+}
+
+
+
+// -----------------------------------------------------------------------------
+    static void checkbox_toggled(
+        GtkWidget *checkbox,
+        gpointer data
+    )
+/*
+    if checkbox toggled, block the button grid
+----------------------------------------------------------------------------- */
+{
+    GtkWidget *colorButtonGrid = GTK_WIDGET(data);
+
+    gboolean isActive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbox));
+
+    gtk_widget_set_sensitive(
+        colorButtonGrid,
+        not isActive
+    );
+
+    gPluginConfiguration.mUseDefaults = isActive;
+
+    update_colors();
+}
+
+
+
+// -----------------------------------------------------------------------------
+    static void color_button_set(
+        GtkColorButton *colorButton,
+        gpointer data
+    )
+/*
+    callback when user changes color
+----------------------------------------------------------------------------- */
+{
+    std::string *strPtr = reinterpret_cast<std::string *>(data);
+
+    GdkColor color;
+    gtk_color_button_get_color(colorButton, &color);
+
+    gchar *colorAsStr = gdk_color_to_string(&color);
+    *strPtr = std::string(colorAsStr);
+
+    g_free(colorAsStr);
+
+    update_colors();
+}
+
+
+
+// -----------------------------------------------------------------------------
+    static GtkWidget* plugin_bracketcolors_configure(
+        GeanyPlugin *plugin,
+        GtkDialog *dialog,
+        gpointer pdata
+    )
+/*
+    make UI elements to configure plugin
+----------------------------------------------------------------------------- */
+{
+    GtkWidget *grid = gtk_grid_new();
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 5);
+
+    GtkWidget *colorButtonGrid = gtk_grid_new();
+    gtk_grid_set_column_spacing(GTK_GRID(colorButtonGrid), 5);
+    gtk_widget_set_margin_start(colorButtonGrid, 5);
+    gtk_widget_set_margin_end(colorButtonGrid, 5);
+    gtk_widget_set_margin_bottom(colorButtonGrid, 5);
+
+    GtkWidget *frame = gtk_frame_new(_("Bracket Colors"));
+    gtk_container_add(GTK_CONTAINER(frame), colorButtonGrid);
+
+    for (guint i = 0; i < BC_NUM_COLORS; i++) {
+
+        GdkColor color;
+        utils_parse_color(gPluginConfiguration.mCustomColors[i].c_str(), &color);
+
+        GtkWidget *colorButton = gtk_color_button_new_with_color(&color);
+
+        gtk_grid_attach(
+            GTK_GRID(colorButtonGrid), colorButton,
+            i, 0, 1, 1
+        );
+
+        g_signal_connect(
+            G_OBJECT(colorButton),
+            "color-set",
+            G_CALLBACK(color_button_set),
+            reinterpret_cast<gpointer>(&gPluginConfiguration.mCustomColors[i])
+        );
+    }
+
+    gtk_grid_attach(
+        GTK_GRID(grid), frame,
+        0, 0, 1, 1
+    );
+
+    GtkWidget *checkBox = gtk_check_button_new_with_label(_("Use Defaults"));
+    gtk_grid_attach(
+        GTK_GRID(grid), checkBox,
+        0, 1, 1, 1
+    );
+
+    g_signal_connect(
+        G_OBJECT(checkBox),
+        "toggled",
+        G_CALLBACK(checkbox_toggled),
+        colorButtonGrid
+    );
+
+    gtk_toggle_button_set_active(
+        GTK_TOGGLE_BUTTON(checkBox),
+        gPluginConfiguration.mUseDefaults
+    );
+
+    return grid;
 }
 
 
@@ -1360,15 +1393,16 @@
 
 
 
-
-
 // -----------------------------------------------------------------------------
     extern "C" void geany_load_module(GeanyPlugin *plugin)
 /*
     Load module
 ----------------------------------------------------------------------------- */
 {
-    //main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
+
+#ifdef HAVE_LOCALE_H
+    main_locale_init(LOCALEDIR, GETTEXT_PACKAGE);
+#endif
 
     /* Set metadata */
     plugin->info->name          = _("Bracket Colors");
@@ -1380,6 +1414,7 @@
     plugin->funcs->init         = plugin_bracketcolors_init;
     plugin->funcs->cleanup      = plugin_bracketcolors_cleanup;
     plugin->funcs->callbacks    = plugin_bracketcolors_callbacks;
+    plugin->funcs->configure    = plugin_bracketcolors_configure;
 
     /* Register! */
     GEANY_PLUGIN_REGISTER(plugin, 226);

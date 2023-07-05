@@ -1,7 +1,7 @@
 /*
  *      BracketMap.h
  *
- *      Copyright 2013 Asif Amin <asifamin@utexas.edu>
+ *      Copyright 2023 Asif Amin <asifamin@utexas.edu>
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 
 #include <map>
 #include <tuple>
+#include <set>
 
 #include <glib.h>
 
@@ -40,10 +41,8 @@
     BracketMap();
     ~BracketMap();
 
-    void Show();
-
     void Update(Index index, Length length);
-    void ComputeOrder();
+    std::set<Index> ComputeOrder();
 
     static const gint UNDEFINED = -1;
 
@@ -61,16 +60,5 @@
         return std::get<1>(bracket);
     }
 };
-
-
-
-
-
-
-
-
-
-
-
 
 #endif
