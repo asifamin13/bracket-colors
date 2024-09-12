@@ -10,11 +10,11 @@ add_library( bracketcolors SHARED
     Utils.cc
 )
 
-add_definitions( ${GEANY_CFLAGS} )
-target_compile_features(bracketcolors PRIVATE cxx_std_17)
+target_compile_options( bracketcolors PRIVATE ${GEANY_CFLAGS} )
+target_compile_features( bracketcolors PRIVATE cxx_std_17 )
 
 target_link_libraries( bracketcolors PUBLIC
-    ${GEANY_LIBRARIES}
+    ${GEANY_LINK_LIBRARIES}
 )
 
 target_include_directories( bracketcolors PUBLIC
