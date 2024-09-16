@@ -998,7 +998,15 @@
                 ) {
                     // check if in a comment
                     if (is_ignore_style(data, *position)) {
-                        bracketMap.mBracketMap.erase(*position);
+                        // check if the closing bracket in a comment needs to be cleared
+                        auto it = bracketMap.mBracketMap.find(*position);
+                        if (it != bracketMap.mBracketMap.end()) {
+                            auto length = BracketMap::GetLength(it->second);
+                            if (length != BracketMap::UNDEFINED) {
+                                clear_bc_indicators(sci, (*position) + length, 1);
+                            }
+                            bracketMap.mBracketMap.erase(it->first);
+                        }
                         clear_bc_indicators(sci, *position, 1);
                     }
                     else {
