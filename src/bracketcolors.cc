@@ -423,6 +423,9 @@
     gint braceIdentity = position;
 
     if (is_ignore_style(sci, position) or is_ignore_style(sci, matchedBrace)) {
+        // https://www.scintilla.org/ScintillaDoc.html#SCI_BRACEMATCH
+        // A match only occurs if the style of the matching brace is the same as
+        // the starting brace or the matching brace is beyond the end of styling.
         return -2;
     }
 
@@ -979,85 +982,90 @@
         data->init = TRUE;
     }
 
-    if (data->recomputeIndicies.size()) {
+    if (not data->recomputeIndicies.size()) {
+        return TRUE;
+    }
 
-        ScintillaObject *sci = data->doc->editor->sci;
-        std::set<BracketMap::Index> recomputedPositions;
-        gboolean recalculate = FALSE;
-        guint numIterations = 0;
-        for (
-            auto position = data->recomputeIndicies.begin();
-            position != data->recomputeIndicies.end();
-            numIterations++
-        )
-        {
-            for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
+    ScintillaObject *sci = data->doc->editor->sci;
 
-                BracketMap &bracketMap = data->bracketMaps[bracketType];
+    // If we encounter an error computing the brace due to styles changing
+    // it can through off the color orders for entire blocks. If this happens,
+    // just redo the computations which will get fixed once styling settles.
+    std::set<BracketMap::Index> recomputedPositions;
+    gboolean recalculate = FALSE;
 
-                if (
-                    is_bracket_type(
-                        sci_get_char_at(sci, *position),
-                        static_cast<BracketType>(bracketType)
-                    )
-                ) {
-                    // check if in a comment
-                    if (is_ignore_style(sci, *position)) {
-                        // check if the closing bracket in a comment needs to be cleared
-                        auto it = bracketMap.mBracketMap.find(*position);
-                        if (it != bracketMap.mBracketMap.end()) {
-                            auto length = BracketMap::GetLength(it->second);
-                            if (length != BracketMap::UNDEFINED) {
-                                clear_bc_indicators(sci, (*position) + length, 1);
-                            }
-                            bracketMap.mBracketMap.erase(it->first);
+    guint numIterations = 0;
+    for (
+        auto position = data->recomputeIndicies.begin();
+        position != data->recomputeIndicies.end();
+        numIterations++
+    )
+    {
+        for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
+
+            BracketMap &bracketMap = data->bracketMaps[bracketType];
+
+            if (
+                is_bracket_type(
+                    sci_get_char_at(sci, *position),
+                    static_cast<BracketType>(bracketType)
+                )
+            ) {
+                // check if in a comment
+                if (is_ignore_style(sci, *position)) {
+                    // check if the closing bracket in a comment needs to be cleared
+                    auto it = bracketMap.mBracketMap.find(*position);
+                    if (it != bracketMap.mBracketMap.end()) {
+                        auto length = BracketMap::GetLength(it->second);
+                        if (length != BracketMap::UNDEFINED) {
+                            clear_bc_indicators(sci, (*position) + length, 1);
                         }
-                        clear_bc_indicators(sci, *position, 1);
+                        bracketMap.mBracketMap.erase(it->first);
                     }
-                    else {
-                        gint brace = compute_bracket_at(sci, bracketMap, *position);
-                        if (brace >= 0) {
-                            data->redrawIndicies.insert(brace);
-                            recomputedPositions.insert(brace);
-                        }
-                        else if (brace == -2) {
-                            // Tried to brace match across comments which have
-                            // different sylings. Need to redo computations
-                            recalculate = TRUE;
-                        }
-                        data->updateUI = TRUE;
-                    }
-
-                    break;
+                    clear_bc_indicators(sci, *position, 1);
                 }
-            }
+                else {
+                    gint brace = compute_bracket_at(sci, bracketMap, *position);
+                    recomputedPositions.insert(*position);
+                    if (brace >= 0) {
+                        data->redrawIndicies.insert(brace);
+                    }
+                    else if (brace == -2) {
+                        // Tried to brace match across nonsource which can
+                        // have different sylings. Need to redo computations
+                        recalculate = TRUE;
+                    }
+                    data->updateUI = TRUE;
+                }
 
-            position = data->recomputeIndicies.erase(position);
-            if (numIterations >= sIterationLimit) {
                 break;
             }
         }
 
-        if (recalculate) {
-            data->recomputeIndicies.insert(
-                recomputedPositions.begin(),
-                recomputedPositions.end()
-            );
+        position = data->recomputeIndicies.erase(position);
+
+        if (numIterations >= sIterationLimit) {
+            break;
         }
-        else {
-
-            if (data->updateUI) {
-                for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
-                    BracketMap &bracketMap = data->bracketMaps[bracketType];
-                    std::set<BracketMap::Index> updatedBrackets = bracketMap.ComputeOrder();
-                    data->redrawIndicies.insert(updatedBrackets.begin(), updatedBrackets.end());
-                }
-            }
-
-        }
-
-
     }
+
+    if (recalculate) {
+        // Redo everything we just did since it's likely wrong
+        data->recomputeIndicies.insert(
+            recomputedPositions.begin(),
+            recomputedPositions.end()
+        );
+    }
+    else {
+        if (data->updateUI) {
+            for (gint bracketType = 0; bracketType < BracketType::COUNT; bracketType++) {
+                BracketMap &bracketMap = data->bracketMaps[bracketType];
+                std::set<BracketMap::Index> updatedBrackets = bracketMap.ComputeOrder();
+                data->redrawIndicies.insert(updatedBrackets.begin(), updatedBrackets.end());
+            }
+        }
+    }
+
 
     return TRUE;
 }
